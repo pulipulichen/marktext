@@ -1,4 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { compile, createApp } from 'vue'
+import { Muya } from '@muyajs/core'
 import { createPlatformPath } from 'common/filesystem/platformPath'
 import { imageFilePaths, showImageContextMenu } from '@/contextMenu/imageMenu'
 import { popupContextMenu } from '@/contextMenu/popupMenu'
@@ -51,6 +56,55 @@ describe('image context menu paths', () => {
 })
 
 describe('image context menu actions', () => {
+  it.each([false, true])('keeps the image menu after Muya replaces its host (readOnly: %s)', (readOnly) => {
+    // Compile the production listener placement, omitting sibling panels that need desktop stores.
+    const source = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../../src/renderer/src/components/editorWithTabs/editor.vue'), 'utf8')
+    const shell = source.split('<template>')[1].split('<media-viewer')[0] + '</div>'
+    const host = document.createElement('div')
+    document.body.append(host)
+    const onError = vi.fn()
+    const app = createApp({
+      render: compile(shell),
+      setup: () => ({
+        typewriter: false,
+        focus: false,
+        sourceCode: false,
+        viewerOpen: false,
+        textDirection: 'ltr',
+        handleImageContextMenu: (event: MouseEvent) => showImageContextMenu(event, '/tmp/note.md', key => key, onError)
+      })
+    })
+    app.mount(host)
+    const original = host.querySelector<HTMLElement>('.editor-component')!
+    const engine = new Muya(original, { readOnly })
+    try {
+      expect(original.isConnected).toBe(false)
+      const paragraph = document.createElement('p')
+      engine.domNode.append(paragraph)
+      const textMenu = new MouseEvent('contextmenu', { bubbles: true, cancelable: true })
+      paragraph.dispatchEvent(textMenu)
+      expect(popupContextMenu).not.toHaveBeenCalled()
+      if (!readOnly) expect(textMenu.defaultPrevented).toBe(false)
+      const readingMenu = vi.fn()
+      engine.on('reading-context-menu', readingMenu)
+      const image = document.createElement('img')
+      image.src = 'file:///tmp/assets/a.png'
+      Object.defineProperties(image, { complete: { value: true }, naturalWidth: { value: 20 } })
+      engine.domNode.append(image)
+      const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true })
+      image.dispatchEvent(event)
+      expect(popupContextMenu).toHaveBeenCalledOnce()
+      expect(event.defaultPrevented).toBe(true)
+      expect(readingMenu).not.toHaveBeenCalled()
+      const items = vi.mocked(popupContextMenu).mock.calls[0][0] as ContextMenuItem[]
+      expect(items.map(item => item.label)).toEqual(['contextMenu.copyImage', 'contextMenu.copyRelativeImagePath', 'contextMenu.copyAbsoluteImagePath'])
+    } finally {
+      engine.destroy()
+      app.unmount()
+      host.remove()
+    }
+  })
+
   const open = (src: string, documentPath?: string) => {
     const image = document.createElement('img')
     image.src = src

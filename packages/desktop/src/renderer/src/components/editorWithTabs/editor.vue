@@ -1,15 +1,16 @@
 <template>
+  <!-- Muya replaces editorRef's node during construction, so capture events on its parent. -->
   <div
     class="editor-wrapper"
     :class="[
       { typewriter: typewriter, focus: focus, source: sourceCode, 'viewer-open': viewerOpen }
     ]"
     :dir="textDirection"
+    @contextmenu.capture="handleImageContextMenu"
   >
     <div
       ref="editorRef"
       class="editor-component"
-      @contextmenu.capture="handleImageContextMenu"
     />
     <media-viewer
       ref="mediaViewer"
