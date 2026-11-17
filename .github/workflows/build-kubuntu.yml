@@ -25,7 +25,7 @@ jobs:
       - name: Install Linux build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y icnsutils graphicsmagick xz-utils libx11-dev libxkbfile-dev gnome-keyring libsecret-1-dev libfontconfig-dev rpm
+          sudo apt-get install -y icnsutils graphicsmagick xz-utils libx11-dev libxkbfile-dev gnome-keyring libsecret-1-dev libfontconfig-dev rpm xvfb xauth
 
       - uses: ./.github/actions/setup
 
@@ -54,6 +54,9 @@ jobs:
           sudo apt-get install -y "./${packages[0]}"
           test "$(dpkg-query -W -f='${Status}' "$package_name")" = 'install ok installed'
           sudo apt-get check
+
+      - name: Validate image toolbar with the system clipboard
+        run: xvfb-run --auto-servernum pnpm -C packages/desktop exec playwright test test/e2e/image-toolbar-copy.spec.ts
 
       - name: Capture build metadata
         id: build-info
