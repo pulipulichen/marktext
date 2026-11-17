@@ -83,7 +83,7 @@ jobs:
         with:
           tag_name: ${{ steps.build-info.outputs.tag }}
           target_commitish: ${{ steps.build-info.outputs.commit }}
-          name: Kubuntu 24.04 amd64 build #${{ github.run_number }}
+          name: "Kubuntu 24.04 amd64 build #${{ github.run_number }}"
           body: |
             Manually triggered Kubuntu 24.04 amd64 build.
 
