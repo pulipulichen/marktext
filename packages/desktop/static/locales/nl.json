@@ -188,6 +188,9 @@
     }
   },
   "contextMenu": {
+    "copyImage": "Afbeelding kopiëren",
+    "copyRelativeImagePath": "Relatief afbeeldingspad kopiëren",
+    "copyAbsoluteImagePath": "Absoluut afbeeldingspad kopiëren",
     "cut": "Knippen",
     "copy": "Kopiëren",
     "paste": "Plakken",

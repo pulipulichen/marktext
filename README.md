@@ -207,3 +207,12 @@ Thank you to all the people who have already contributed to MarkText[[contributo
 ## License
 
 [**MIT**](LICENSE).
+
+### Manual Kubuntu 24.04 packages (this fork)
+
+Open [Manual Kubuntu 24.04 Build](https://github.com/pulipulichen/marktext/actions/workflows/build-kubuntu.yml),
+click **Run workflow**, and leave **Branch or tag to build** as `develop` (or enter another ref).
+This workflow runs only when requested; pushing commits does not start it and it does not publish a Release.
+It builds amd64 packages on Ubuntu 24.04 and installs the generated `.deb` with APT to validate dependencies.
+After a successful run, download `marktext-kubuntu-24.04-amd64-deb` from the run's **Artifacts**, extract it,
+and install the package with `sudo apt install ./marktext-*.deb`. An AppImage artifact is also provided.

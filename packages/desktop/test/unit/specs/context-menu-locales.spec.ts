@@ -9,6 +9,16 @@ const __dirname = path.dirname(__filename)
 const localesDir = path.resolve(__dirname, '../../../static/locales')
 
 describe('context menu locale coverage', () => {
+  it('defines image clipboard actions for every supported desktop locale', () => {
+    for (const language of getSupportedLanguages()) {
+      const locale = JSON.parse(fs.readFileSync(path.join(localesDir, `${language}.json`), 'utf8'))
+      for (const key of ['copyImage', 'copyRelativeImagePath', 'copyAbsoluteImagePath']) {
+        expect(locale.contextMenu[key], `${language} contextMenu.${key}`).toEqual(expect.any(String))
+        expect(locale.contextMenu[key]).not.toBe('')
+      }
+    }
+  })
+
   it('defines Look Up for every supported desktop locale', () => {
     for (const language of getSupportedLanguages()) {
       const localePath = path.join(localesDir, `${language}.json`)

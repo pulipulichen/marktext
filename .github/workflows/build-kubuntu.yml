@@ -1,0 +1,72 @@
+name: Manual Kubuntu 24.04 Build
+run-name: Kubuntu 24.04 amd64 (${{ inputs.build_ref }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_ref:
+        description: Branch or tag to build
+        required: true
+        default: develop
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  linux-x64:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.build_ref }}
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y icnsutils graphicsmagick xz-utils libx11-dev libxkbfile-dev gnome-keyring libsecret-1-dev libfontconfig-dev rpm
+
+      - uses: ./.github/actions/setup
+
+      - name: Run postinstall
+        run: pnpm tsx scripts/postinstall.ts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          npm_config_user_agent: pnpm
+          USE_ELECTRON_CLANG: '0'
+
+      - name: Build Linux amd64 packages
+        run: pnpm run build:linux:x64
+        env:
+          USE_ELECTRON_CLANG: '0'
+
+      - name: Validate Debian package installation on Ubuntu 24.04
+        shell: bash
+        run: |
+          set -euo pipefail
+          packages=(dist/*.deb)
+          test "${#packages[@]}" -eq 1
+          test -f "${packages[0]}"
+          test "$(dpkg-deb -f "${packages[0]}" Architecture)" = amd64
+          package_name=$(dpkg-deb -f "${packages[0]}" Package)
+          sudo apt-get update
+          sudo apt-get install -y "./${packages[0]}"
+          test "$(dpkg-query -W -f='${Status}' "$package_name")" = 'install ok installed'
+          sudo apt-get check
+
+      - name: Upload Debian installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: marktext-kubuntu-24.04-amd64-deb
+          path: dist/*.deb
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v7
+        with:
+          name: marktext-linux-x64-appimage
+          path: dist/*.AppImage
+          if-no-files-found: error
+          retention-days: 30

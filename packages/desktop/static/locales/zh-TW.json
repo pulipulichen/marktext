@@ -188,6 +188,9 @@
     }
   },
   "contextMenu": {
+    "copyImage": "複製圖片",
+    "copyRelativeImagePath": "複製圖片相對路徑",
+    "copyAbsoluteImagePath": "複製圖片絕對路徑",
     "cut": "剪下",
     "copy": "複製",
     "paste": "貼上",

@@ -188,6 +188,9 @@
     }
   },
   "contextMenu": {
+    "copyImage": "Bild kopieren",
+    "copyRelativeImagePath": "Relativen Bildpfad kopieren",
+    "copyAbsoluteImagePath": "Absoluten Bildpfad kopieren",
     "cut": "Ausschneiden",
     "copy": "Kopieren",
     "paste": "Einfügen",

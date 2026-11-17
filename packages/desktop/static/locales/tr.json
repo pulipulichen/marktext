@@ -188,6 +188,9 @@
     }
   },
   "contextMenu": {
+    "copyImage": "Resmi kopyala",
+    "copyRelativeImagePath": "Resmin göreli yolunu kopyala",
+    "copyAbsoluteImagePath": "Resmin mutlak yolunu kopyala",
     "cut": "Kes",
     "copy": "Kopyala",
     "paste": "Yapıştır",

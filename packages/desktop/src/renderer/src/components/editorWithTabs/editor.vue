@@ -9,6 +9,7 @@
     <div
       ref="editorRef"
       class="editor-component"
+      @contextmenu.capture="handleImageContextMenu"
     />
     <media-viewer
       ref="mediaViewer"
@@ -148,6 +149,7 @@ import {
   pruneSourceHistory
 } from '../../services/documentMode'
 import { popupContextMenu } from '../../contextMenu/popupMenu'
+import { showImageContextMenu } from '../../contextMenu/imageMenu'
 import { useEditorStore } from '@/store/editor'
 import { useProjectStore } from '@/store/project'
 import { storeToRefs } from 'pinia'
@@ -1024,6 +1026,12 @@ const handleCopyPaste = (type: unknown) => {
     const method = COPY_PASTE_METHOD_MAP[type as string]
     if (method) editor.value[method]()
   }
+}
+
+const handleImageContextMenu = (event: MouseEvent) => {
+  showImageContextMenu(event, currentFile.value?.pathname, t, (error) => {
+    void notice.notify({ title: t('editor.mediaViewer.copyFailed', { error: String(error) }), type: 'error' })
+  })
 }
 
 const insertImage = (src: unknown) => {

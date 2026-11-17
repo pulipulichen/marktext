@@ -188,6 +188,9 @@
     }
   },
   "contextMenu": {
+    "copyImage": "复制图片",
+    "copyRelativeImagePath": "复制图片相对路径",
+    "copyAbsoluteImagePath": "复制图片绝对路径",
     "cut": "剪切",
     "copy": "复制",
     "paste": "粘贴",
