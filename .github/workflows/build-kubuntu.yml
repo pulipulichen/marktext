@@ -11,7 +11,7 @@ on:
         type: string
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   linux-x64:
@@ -55,18 +55,59 @@ jobs:
           test "$(dpkg-query -W -f='${Status}' "$package_name")" = 'install ok installed'
           sudo apt-get check
 
-      - name: Upload Debian installer
-        uses: actions/upload-artifact@v7
-        with:
-          name: marktext-kubuntu-24.04-amd64-deb
-          path: dist/*.deb
-          if-no-files-found: error
-          retention-days: 30
+      - name: Capture build metadata
+        id: build-info
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "tag=kubuntu-24.04-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
 
-      - name: Upload AppImage
-        uses: actions/upload-artifact@v7
+      - name: Generate SHA256 checksums
+        working-directory: dist
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          packages=( *.deb *.AppImage )
+          test "${#packages[@]}" -gt 0
+          printf '%s\n' "${packages[@]}" | LC_ALL=C sort | while IFS= read -r file; do
+            sha256sum "$file"
+          done > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      # Upload assets to a draft first, then publish it. This also works with
+      # repositories that enforce immutable published releases.
+      - name: Create draft GitHub Release
+        uses: softprops/action-gh-release@v3.0.3
         with:
-          name: marktext-linux-x64-appimage
-          path: dist/*.AppImage
-          if-no-files-found: error
-          retention-days: 30
+          tag_name: ${{ steps.build-info.outputs.tag }}
+          target_commitish: ${{ steps.build-info.outputs.commit }}
+          name: Kubuntu 24.04 amd64 build #${{ github.run_number }}
+          body: |
+            Manually triggered Kubuntu 24.04 amd64 build.
+
+            - Source ref: `${{ inputs.build_ref }}`
+            - Commit: `${{ steps.build-info.outputs.commit }}`
+            - Workflow run: [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+            Verify downloaded packages with:
+
+            ```bash
+            sha256sum -c SHA256SUMS.txt --ignore-missing
+            ```
+          draft: true
+          prerelease: true
+          fail_on_unmatched_files: true
+          files: |
+            dist/*.deb
+            dist/*.AppImage
+            dist/SHA256SUMS.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.build-info.outputs.tag }}
+        run: gh release edit "$RELEASE_TAG" --draft=false --prerelease --repo "$GITHUB_REPOSITORY"
