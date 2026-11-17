@@ -3,9 +3,9 @@ import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { compile, createApp } from 'vue'
-import { Muya } from '@muyajs/core'
+import { ImageToolBar, Muya } from '@muyajs/core'
 import { createPlatformPath } from 'common/filesystem/platformPath'
-import { imageFilePaths, showImageContextMenu } from '@/contextMenu/imageMenu'
+import { createImageCopyActions, imageFilePaths, showImageContextMenu } from '@/contextMenu/imageMenu'
 import { popupContextMenu } from '@/contextMenu/popupMenu'
 import { copyImageToClipboard, readImagePng } from '@/util/clipboard'
 import type * as ClipboardModule from '@/util/clipboard'
@@ -25,6 +25,102 @@ beforeEach(() => {
   vi.stubGlobal('electron', { process: { platform: 'linux' }, clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } })
 })
 afterEach(() => vi.unstubAllGlobals())
+
+describe('image toolbar copy buttons', () => {
+  const boot = (sources: string[], documentPath?: string, loaded = true) => {
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+    const host = document.createElement('div')
+    document.body.append(host)
+    const engine = new Muya(host, { markdown: sources.map(src => `![image](${src})`).join('\n\n') })
+    engine.init({ focus: false })
+    const onError = vi.fn()
+    const toolbar = new ImageToolBar(engine, {
+      getImageActions: image => createImageCopyActions(image, documentPath, key => key, onError)
+    })
+    const images = Array.from(engine.domNode.querySelectorAll('.mu-image-container')).map((container, index) => {
+      const image = document.createElement('img')
+      image.src = sources[index]
+      Object.defineProperties(image, { complete: { value: loaded }, naturalWidth: { value: loaded ? 20 : 0 } })
+      container.append(image)
+      return image
+    })
+    return {
+      toolbar,
+      images,
+      onError,
+      cleanup: () => {
+        toolbar.destroy()
+        engine.destroy()
+      }
+    }
+  }
+  const select = (toolbar: ImageToolBar, image: HTMLImageElement) => {
+    image.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    expect(toolbar.status).toBe(true)
+    return Array.from(toolbar.container!.querySelectorAll('button'))
+  }
+
+  it('copies image bytes and both Unicode paths through visible toolbar buttons', async() => {
+    const view = boot(['file:///tmp/assets/%E5%9C%96%20a.png'], '/tmp/note.md')
+    try {
+      const buttons = select(view.toolbar, view.images[0])
+      expect(buttons.map(button => button.textContent)).toEqual(['contextMenu.copyImage', 'contextMenu.copyRelativeImagePath', 'contextMenu.copyAbsoluteImagePath'])
+      for (const button of buttons) button.click()
+      await vi.waitFor(() => expect(copyImageToClipboard).toHaveBeenCalledOnce())
+      expect(readImagePng).toHaveBeenCalledWith('file:///tmp/assets/%E5%9C%96%20a.png')
+      expect(window.electron.clipboard.writeText).toHaveBeenNthCalledWith(1, './assets/圖 a.png')
+      expect(window.electron.clipboard.writeText).toHaveBeenNthCalledWith(2, '/tmp/assets/圖 a.png')
+      expect(popupContextMenu).not.toHaveBeenCalled()
+      expect(view.onError).not.toHaveBeenCalled()
+    } finally {
+      view.cleanup()
+    }
+  })
+
+  it('uses the newly selected image instead of the previous toolbar target', () => {
+    const view = boot(['file:///tmp/first.png', 'file:///tmp/second.png'], '/tmp/note.md')
+    try {
+      select(view.toolbar, view.images[0])
+      select(view.toolbar, view.images[1])[2].click()
+      expect(window.electron.clipboard.writeText).toHaveBeenCalledWith('/tmp/second.png')
+    } finally {
+      view.cleanup()
+    }
+  })
+
+  it.each([
+    ['https://example.com/a.png', '/tmp/note.md'],
+    ['file:///tmp/a.png', undefined]
+  ])('hides unavailable filesystem actions for %s (document: %s)', (src, documentPath) => {
+    const view = boot([src!], documentPath)
+    try {
+      const buttons = select(view.toolbar, view.images[0])
+      expect(buttons).toHaveLength(1)
+      expect(buttons[0].textContent).toBe('contextMenu.copyImage')
+    } finally {
+      view.cleanup()
+    }
+  })
+
+  it('disables image copy until the image has loaded and reports clipboard errors', async() => {
+    const view = boot(['file:///tmp/a.png'], '/tmp/note.md', false)
+    try {
+      const buttons = select(view.toolbar, view.images[0])
+      expect(buttons[0].disabled).toBe(true)
+      buttons[0].click()
+      expect(copyImageToClipboard).not.toHaveBeenCalled()
+      vi.mocked(window.electron.clipboard.writeText).mockRejectedValueOnce(new Error('clipboard unavailable'))
+      buttons[1].click()
+      await vi.waitFor(() => expect(view.onError).toHaveBeenCalledOnce())
+    } finally {
+      view.cleanup()
+    }
+  })
+})
 
 describe('image context menu paths', () => {
   it('decodes Unicode, spaces and escaped URL characters once, without cache suffixes', () => {

@@ -150,7 +150,7 @@ import {
   pruneSourceHistory
 } from '../../services/documentMode'
 import { popupContextMenu } from '../../contextMenu/popupMenu'
-import { showImageContextMenu } from '../../contextMenu/imageMenu'
+import { createImageCopyActions, showImageContextMenu } from '../../contextMenu/imageMenu'
 import { useEditorStore } from '@/store/editor'
 import { useProjectStore } from '@/store/project'
 import { storeToRefs } from 'pinia'
@@ -1733,7 +1733,11 @@ onMounted(() => {
     imagePathAutoComplete
   })
   Muya.use(ImageResizeBar)
-  Muya.use(ImageToolBar)
+  Muya.use(ImageToolBar, {
+    getImageActions: (image: HTMLImageElement) => createImageCopyActions(image, currentFile.value?.pathname, t, (error) => {
+      void notice.notify({ title: t('editor.mediaViewer.copyFailed', { error: String(error) }), type: 'error' })
+    })
+  })
   Muya.use(InlineFormatToolbar, {
     keyboardShortcuts: false,
     getShortcut: shortcuts.format

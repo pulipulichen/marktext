@@ -1,15 +1,27 @@
-import type { ReferenceElement } from '@floating-ui/dom';
 import type { VNode } from 'snabbdom';
 import type Format from '../../block/base/format';
 import type { Muya } from '../../index';
 
 import type { IImageInfo } from '../../utils/image';
+import type { IBaseOptions } from '../types';
 import type { Icon } from './config';
 import { SelectionType } from '../../selection/types';
 import { h, patch } from '../../utils/snabbdom';
 import BaseFloat from '../baseFloat';
 import icons from './config';
 import './index.css';
+
+export interface IImageToolbarAction {
+    id: string;
+    label: string;
+    enabled?: boolean;
+    click: () => void;
+}
+
+export interface IImageToolbarOptions extends Partial<IBaseOptions> {
+    /** The host owns clipboard permissions, file resolution, labels and error reporting. */
+    getImageActions?: (image: HTMLImageElement) => IImageToolbarAction[];
+}
 
 const defaultOptions = {
     placement: 'top' as const,
@@ -27,15 +39,17 @@ export class ImageToolBar extends BaseFloat {
     private _imageInfo: IImageInfo | null = null;
 
     private _icons: Icon[] = icons;
-    private _reference: ReferenceElement | null = null;
+    private _reference: HTMLElement | null = null;
+    private _getImageActions?: IImageToolbarOptions['getImageActions'];
     private _block: Format | null = null;
     private _toolbarContainer: HTMLDivElement = document.createElement('div');
 
-    constructor(muya: Muya, options = {}) {
+    constructor(muya: Muya, options: IImageToolbarOptions = {}) {
         const name = 'mu-image-toolbar';
         const opts = Object.assign({}, defaultOptions, options);
 
         super(muya, name, opts);
+        this._getImageActions = options.getImageActions;
 
         this.container!.appendChild(this._toolbarContainer);
         this.floatBox!.classList.add('mu-image-toolbar-container');
@@ -110,7 +124,31 @@ export class ImageToolBar extends BaseFloat {
             );
         });
 
-        const vnode = h('ul', children);
+        const image = this._reference?.querySelector('img');
+        const actions = image ? this._getImageActions?.(image) ?? [] : [];
+        const actionButtons = actions.map(action => h('button', {
+            key: action.id,
+            attrs: {
+                'type': 'button',
+                'title': action.label,
+                'aria-label': action.label,
+                'disabled': action.enabled === false,
+            },
+            on: {
+                // Keep the image selected while a toolbar button receives the click.
+                mousedown: event => event.preventDefault(),
+                click: (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (action.enabled !== false)
+                        action.click();
+                },
+            },
+        }, action.label));
+        const vnode = h('div', [
+            h('ul', children),
+            ...(actionButtons.length ? [h('div.mu-image-copy-actions', actionButtons)] : []),
+        ]);
 
         if (oldVNode)
             patch(oldVNode, vnode);

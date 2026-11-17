@@ -2,6 +2,13 @@ import { clipboardImagePath, copyImageToClipboard, readImagePng } from '@/util/c
 import { popupContextMenu } from './popupMenu'
 import type { ContextMenuItem } from './popupMenu'
 
+interface ImageCopyAction {
+  id: string
+  label: string
+  enabled?: boolean
+  click: () => void
+}
+
 /** Use the rendered file URL, which Muya has already resolved against the document. */
 export const imageFilePaths = (src: string, documentPath?: string): { absolute: string; relative: string | null } | null => {
   if (!documentPath || !window.path.isAbsolute(documentPath)) return null
@@ -20,21 +27,17 @@ export const imageFilePaths = (src: string, documentPath?: string): { absolute: 
   }
 }
 
-export const showImageContextMenu = (
-  event: MouseEvent,
+export const createImageCopyActions = (
+  image: HTMLImageElement,
   documentPath: string | undefined,
   translate: (key: string) => string,
   onError: (error: unknown) => void
-): boolean => {
-  if (!(event.target instanceof HTMLImageElement)) return false
-  const image = event.target
+): ImageCopyAction[] => {
   const src = image.currentSrc || image.src
   const paths = imageFilePaths(src, documentPath)
-  // Handle images before Muya's reading-mode menu and Electron's native text menu.
-  event.preventDefault()
-  event.stopPropagation()
-  const items: ContextMenuItem[] = [
+  const items: ImageCopyAction[] = [
     {
+      id: 'copy-image',
       label: translate('contextMenu.copyImage'),
       enabled: image.complete && image.naturalWidth > 0,
       click: () => {
@@ -47,16 +50,32 @@ export const showImageContextMenu = (
   if (paths) {
     items.push(
       {
+        id: 'copy-relative-image-path',
         label: translate('contextMenu.copyRelativeImagePath'),
         enabled: paths.relative !== null,
         click: () => { if (paths.relative !== null) void window.electron.clipboard.writeText(paths.relative).catch(onError) }
       },
       {
+        id: 'copy-absolute-image-path',
         label: translate('contextMenu.copyAbsoluteImagePath'),
         click: () => { void window.electron.clipboard.writeText(paths.absolute).catch(onError) }
       }
     )
   }
+  return items
+}
+
+export const showImageContextMenu = (
+  event: MouseEvent,
+  documentPath: string | undefined,
+  translate: (key: string) => string,
+  onError: (error: unknown) => void
+): boolean => {
+  if (!(event.target instanceof HTMLImageElement)) return false
+  // Handle images before Muya's reading-mode menu and Electron's native text menu.
+  event.preventDefault()
+  event.stopPropagation()
+  const items: ContextMenuItem[] = createImageCopyActions(event.target, documentPath, translate, onError)
   popupContextMenu(items, { x: event.clientX, y: event.clientY })
   return true
 }
